@@ -1,7 +1,7 @@
 import os
 import torch
 from .metrics import MetricsTracker
-import tqdm
+from tqdm import tqdm
 import time
 
 class Trainer:
@@ -65,15 +65,15 @@ class Trainer:
                 'acc': f'{tracker.get_average_accuracy():.2f}%'
             })
 
-            return {
+        return {
                 'loss': tracker.get_average_loss(),
                 'accuracy': tracker.get_average_accuracy()
-            }
+        }
     
     @torch.no_grad()
     def validate(self, val_loader):
         self.model.eval()
-        tracker = MetricsTracker
+        tracker = MetricsTracker()
 
         pbar = tqdm(val_loader, desc='Validating')
 
