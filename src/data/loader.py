@@ -3,22 +3,23 @@ import os
 import numpy as np
 import random
 from sklearn.model_selection import train_test_split
-import librosa
+from PIL import Image
+import torch
 
 class GTZANDataset(Dataset):
     def __init__(
             self,
             data_dir: str,
-            segment_length: int = 3,
-            sample_rate: int = 22050,
             mode: str = 'train',
-            random_seed: int = 42
+            file_extension: str = '.png',
+            random_seed: int = 42,
+            img_size = (432, 288)
     ):
         self.data_dir = data_dir
-        self.segment_length = segment_length
-        self.sample_rate = sample_rate
         self.mode = mode
+        self.file_extension = file_extension
         self.random_seed = random_seed
+        self.img_size = img_size
 
         self.genres = [
             'blues', 'classical', 'country', 'disco', 'hiphop',
@@ -52,7 +53,7 @@ class GTZANDataset(Dataset):
                 self.file_paths.append(file_path)
                 self.labels.append(self.genre_to_label[genre])
             
-        print(f"Found {len(self.file_paths)} audio files across {len(self.genres)} genres")
+        print(f"Found {len(self.file_paths)} files across {len(self.genres)} genres")
 
     def _create_splits(self):
         np.random.seed(self.random_seed)
@@ -89,27 +90,28 @@ class GTZANDataset(Dataset):
     def __len__(self) -> int:
         return len(self.file_paths)
 
+    def _load_image(self, file_path):
+        img = Image.open(file_path).convert('L')
+        spec = np.array(img)
+
+        # if we need to normalise
+        # if spec.max() > 1.0:
+        #     spec = spec / 255.0
+
+        return spec.astype(np.float32)
+
     def __getitem__(self, index):
         file_path = self.file_paths[index]
         label = self.labels[index]
 
-        audio, sr = librosa.load(file_path, sr=self.sample_rate, mono=True)
-        segment_samples = self.segment_length * self.sample_rate
+        spec = self._load_image(file_path)
+        spec = np.expand_dims(spec, axis = 0)
 
-        if len(audio) > segment_samples:
-            if self.mode == 'train':
-                max_start = len(audio) - segment_samples
-                start = random.randint(0, max_start)
-            else:
-                start = (len(audio) - segment_samples) // 2
-            
-            audio = audio[start:start + segment_samples]
-        else:
-            padding = segment_samples - len(audio)
-            audio = np.pad(audio, (0, padding), mode='constant')
+        spec_tensor = torch.from_numpy(spec).float()
+        label_tensor = torch.tensor(label, dtype=torch.long)
 
-        return audio, label
-
+        return spec_tensor, label_tensor
+    
 def create_data_loaders(
         data_dir: str,
         batch_size: int = 32,
@@ -168,26 +170,3 @@ def create_data_loaders(
     print(f"Val loader: {len(val_loader)}")
 
     return train_loader, test_loader, val_loader
-
-if __name__ == '__main__':
-    print("Testing audio loading...")
-
-    data_dir = 'data/gtzan/genres_original'
-    train_loader, test_loader, val_loader = create_data_loaders(
-        data_dir=data_dir,
-        batch_size=8,
-        segment_length=3
-    )
-
-    audio_batch, label_batch = next(iter(train_loader))
-
-    print("Successfully loaded batch!")
-    print(f"Audio shape: {audio_batch.shape}")
-    print(f"Label shape: {label_batch.shape}")
-    print(f"Sample labels: {label_batch}")
-
-    dataset = GTZANDataset(data_dir, mode='train')
-    audio, label = dataset[0]
-    print(f"Successfully loaded single sample!")
-    print(f"Audio shape: {audio.shape}")
-    print(f"Label: {label} ({dataset.label_to_genre[label]})")
