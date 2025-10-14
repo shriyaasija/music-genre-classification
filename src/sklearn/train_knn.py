@@ -1,16 +1,16 @@
-from data_loader import load_and_prepare_data
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent.parent))
+
+from src.data.data_loader import load_and_prepare_data
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import classification_report, confusion_matrix
-import joblib
-import os
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.metrics import classification_report
 
-def main():
+def train_knn():
     data = load_and_prepare_data()
     if not data: return
-    X_train, X_test, y_train, y_test, class_names, _ = data
+    X_train, X_test, y_train, y_test, label_encoder = data
 
     print("\n--- Training and Tuning K-Nearest Neighbors ---")
     param_grid = {'n_neighbors': [3, 5, 7, 9, 11]}
@@ -19,19 +19,8 @@ def main():
     best_model = grid_search.best_estimator_
 
     y_pred_test = best_model.predict(X_test)
-    print("\nClassification Report (K-Nearest Neighbors):")
-    print(classification_report(y_test, y_pred_test, target_names=class_names))
+    report = classification_report(y_test, y_pred_test, output_dict=True)
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred_test))
 
-    cm = confusion_matrix(y_test, y_pred_test, labels=class_names)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
-    plt.xlabel('Predicted Label')
-    plt.ylabel('True Label')
-    plt.title('Confusion Matrix - K-Nearest Neighbors')
-    plt.show()
-
-    os.makedirs("model_outputs", exist_ok=True)
-    joblib.dump(best_model, 'model_outputs/knn_model.joblib')
-    print("Tuned K-Nearest Neighbors model saved successfully.")
-
-if __name__ == "__main__": main()
+    return best_model, report, label_encoder, X_test, y_test

@@ -1,16 +1,14 @@
-from data_loader import load_and_prepare_data
+from src.data.data_loader import load_and_prepare_data
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, accuracy_score
 import joblib
 import os
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-def main():
+def train_random_forest():
     data = load_and_prepare_data()
     if not data: return
-    X_train, X_test, y_train, y_test, class_names, _ = data
+    X_train, X_test, y_train, y_test, label_encoder = data
 
     print("\n--- Training and Tuning Random Forest ---")
     param_grid = {'n_estimators': [100, 200, 300], 'max_depth': [10, 20]}
@@ -19,19 +17,8 @@ def main():
     best_model = grid_search.best_estimator_
 
     y_pred_test = best_model.predict(X_test)
-    print("\nClassification Report (Random Forest):")
-    print(classification_report(y_test, y_pred_test, target_names=class_names))
+    report = classification_report(y_test, y_pred_test, output_dict=True)
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred_test))
 
-    cm = confusion_matrix(y_test, y_pred_test, labels=class_names)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
-    plt.xlabel('Predicted Label')
-    plt.ylabel('True Label')
-    plt.title('Confusion Matrix - Random Forest')
-    plt.show()
-
-    os.makedirs("model_outputs", exist_ok=True)
-    joblib.dump(best_model, 'model_outputs/random_forest_model.joblib')
-    print("Tuned Random Forest model saved successfully.")
-
-if __name__ == "__main__": main()
+    return best_model, report, label_encoder, X_test, y_test
